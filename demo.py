@@ -1,80 +1,78 @@
-import nltk
-from nltk.tokenize import word_tokenize
-from nltk.corpus import stopwords
-from nltk.stem import PorterStemmer
-import re
-
-def preprocess(text):
-    text = re.sub(r'[^a-zA-Z ]', '', text)  # Script Validation (Remove non-alphabetic characters)
-    tokens = word_tokenize(text.lower())  # Tokenization
-    tokens = [word for word in tokens if word not in stopwords.words('english')]  # Stop Word Removal
-    stemmed = [PorterStemmer().stem(word) for word in tokens]  # Stemming
-    return stemmed
-
-text = "Hello! This is an example sentence for NLP preprocessing in Python."
-print(preprocess(text))
-
-
+#1
+import pandas as pd
 import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
 
-def min_edit_distance(s1, s2):
-    m, n = len(s1), len(s2)
-    dp = np.zeros((m+1, n+1), dtype=int)
-    for i in range(m+1): dp[i][0] = i
-    for j in range(n+1): dp[0][j] = j
-    for i in range(1, m+1):
-        for j in range(1, n+1):
-            dp[i][j] = min(
-                dp[i-1][j] + 1,  # Deletion
-                dp[i][j-1] + 1,  # Insertion
-                dp[i-1][j-1] + (s1[i-1] != s2[j-1])  # Substitution
-            )
-    return dp[m][n]
+df = sns.load_dataset('tips')
+num_col, cat_col = 'total_bill', 'sex'
 
-print(min_edit_distance("kitten",   "sitting"))
+print(df[num_col].describe())
 
-from collections import Counter
+sns.histplot(df[num_col], kde=True); plt.show()
+sns.boxplot(x=df[num_col]); plt.show()
+
+q1, q3 = df[num_col].quantile([0.25, 0.75])
+iqr = q3 - q1
+outliers = df[(df[num_col] < q1 - 1.5 * iqr) | (df[num_col] > q3 + 1.5 * iqr)]
+print("Outliers:\n", outliers)
+
+df[cat_col].value_counts().plot(kind='bar'); plt.show()
+df[cat_col].value_counts().plot(kind='pie', autopct='%1.1f%%'); plt.show()
+
+
+#2
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+df = sns.load_dataset('iris')
+n1, n2 = 'sepal_length', 'sepal_width'
+
+sns.scatterplot(x=df[n1], y=df[n2]); plt.show()
+print(f'Pearson Correlation: {df[n1].corr(df[n2])}')
+
+corr_matrix = df.select_dtypes(include='number').corr()
+print(corr_matrix)
+sns.heatmap(corr_matrix, annot=True, cmap='coolwarm'); plt.show()
+
+#3
 import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.datasets import load_iris
+from sklearn.preprocessing import StandardScaler
 
-docs = [
-    ("fun couple love love", "comedy"),
-    ("fast furious shoot", "action"),
-    ("couple fly fast fun fun", "comedy"),
-    ("furious shoot shoot fun", "action"),
-    ("fly fast shoot love", "action")
-]
+iris = load_iris()
+X, y = StandardScaler().fit_transform(iris.data), iris.target
 
-vocab = set(word for doc, _ in docs for word in doc.split())
-word_counts = {"comedy": Counter(), "action": Counter()}
-class_counts = Counter()
+cov_matrix = np.cov(X.T)
+eigenvalues, eigenvectors = np.linalg.eig(cov_matrix)
+idx = np.argsort(eigenvalues)[::-1]
+X_pca = X @ eigenvectors[:, idx[:2]]
 
-for doc, label in docs:
-    word_counts[label].update(doc.split())
-    class_counts[label] += 1
+plt.scatter(X_pca[:, 0], X_pca[:, 1], c=y, cmap='viridis', edgecolor='k', s=100)
+plt.colorbar(label='Species')
+plt.show()
 
-def predict(doc):
-    words = doc.split()
-    total_docs = sum(class_counts.values())
-    probs = {c: np.log(class_counts[c] / total_docs) for c in class_counts}
-    for c in class_counts:
-        for word in words:
-            probs[c] += np.log((word_counts[c][word] + 1) / (sum(word_counts[c].values()) + len(vocab)))
-    return max(probs, key=probs.get)
+print("Explained variance ratio:", eigenvalues[idx[:2]] / eigenvalues.sum())
 
-print(predict("fast couple shoot fly"))
+#4
+import numpy as np
+import matplotlib.pyplot as plt
 
-from nltk.corpus import wordnet
-import nltk
+np.random.seed(42)
+X = np.linspace(0, 10, 100)[:, None]
+y = np.sin(X).ravel() + np.random.normal(scale=0.2, size=X.shape[0])
 
-def get_synonyms_antonyms(word):
-    synonyms, antonyms = set(), set()
-    for syn in wordnet.synsets(word):
-        for lemma in syn.lemmas():
-            synonyms.add(lemma.name())
-            if lemma.antonyms():
-                antonyms.add(lemma.antonyms()[0].name())
-    return synonyms, antonyms
+def lwr(x, y, xq, tau):
+    W = np.exp(-((x - xq) ** 2) / (2 * tau ** 2))
+    W = np.diag(W.ravel())
+    X_aug = np.c_[np.ones_like(x), x]
+    theta = np.linalg.pinv(X_aug.T @ W @ X_aug) @ (X_aug.T @ W @ y)
+    return np.array([1, xq]) @ theta
 
-synonyms, antonyms = get_synonyms_antonyms("active")
-print("Synonyms:", synonyms)
-print("Antonyms:", antonyms)
+y_pred = np.array([lwr(X, y, xq, 0.5) for xq in X.ravel()])
+
+plt.scatter(X, y, color='blue', alpha=0.5)
+plt.plot(X, y_pred, color='red')
+plt.show()
